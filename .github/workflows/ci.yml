@@ -52,3 +52,8 @@ jobs:
 
       - name: Build frontend
         run: npm run build --workspace=frontend
+
+      - name: Typecheck and build CLI
+        run: |
+          npm run typecheck --workspace=cli
+          npm run build --workspace=cli
