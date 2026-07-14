@@ -1,9 +1,6 @@
 # CertProof
 
-[![CI](https://github.com/MrShiroLu/certproof/actions/workflows/ci.yml/badge.svg)](https://github.com/MrShiroLu/certproof/actions/workflows/ci.yml)
-
-> The badge above assumes this project is pushed to `github.com/MrShiroLu/certproof`.
-> Update the owner/repo in the badge URL once the real repository is created.
+[![CI](https://github.com/MrShiroLu/midnight-cert-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/MrShiroLu/midnight-cert-proof/actions/workflows/ci.yml)
 
 A confidential certificate verification dApp on Midnight: an issuer registers a
 certificate as an opaque commitment, and the holder later proves on-chain that
