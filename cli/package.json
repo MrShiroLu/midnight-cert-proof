@@ -1,0 +1,17 @@
+{
+  "name": "@midnight-ntwrk/certproof-cli",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "node --no-warnings --experimental-specifier-resolution=node --loader ts-node/esm src/deploy-demo.ts",
+    "issue": "node --no-warnings --experimental-specifier-resolution=node --loader ts-node/esm src/issue-certificate.ts",
+    "build": "rm -rf dist && tsc --project tsconfig.build.json",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/certproof-contract": "*"
+  }
+}
