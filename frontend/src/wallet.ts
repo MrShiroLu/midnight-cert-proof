@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import '@midnight-ntwrk/dapp-connector-api'
+import type { ConnectedAPI } from '@midnight-ntwrk/dapp-connector-api'
 
 const PREPROD_NETWORK_ID = 'preprod'
 
@@ -9,6 +10,7 @@ type WalletState = {
   status: WalletStatus
   walletName: string | null
   address: string | null
+  api: ConnectedAPI | null
   error: string | null
 }
 
@@ -16,6 +18,7 @@ const initialState: WalletState = {
   status: 'disconnected',
   walletName: null,
   address: null,
+  api: null,
   error: null,
 }
 
@@ -53,6 +56,7 @@ export function useWallet() {
         status: 'connected',
         walletName: initialApi.name,
         address: unshieldedAddress,
+        api: connectedApi,
         error: null,
       })
     } catch (err) {

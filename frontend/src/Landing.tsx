@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { GradientBackground } from './GradientBackground'
 import { InteractiveDotGrid } from './InteractiveDotGrid'
 import { WalletButton } from './WalletButton'
+import { useWallet } from './wallet'
 
 const steps = [
   {
@@ -22,6 +23,7 @@ const steps = [
 ]
 
 export function Landing() {
+  const wallet = useWallet()
   return (
     <div className="relative min-h-svh">
       <GradientBackground />
@@ -31,7 +33,7 @@ export function Landing() {
       <div className="relative flex min-h-svh flex-col">
         <header className="flex items-center justify-between px-8 py-6">
           <span className="text-xl font-semibold">CertProof</span>
-          <WalletButton />
+          <WalletButton wallet={wallet} />
         </header>
 
         <main className="flex flex-1 flex-col justify-center px-8 py-16">

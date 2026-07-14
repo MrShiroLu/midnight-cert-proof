@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { shortenAddress, useWallet } from './wallet'
 
-export function WalletButton() {
-  const { status, address, walletName, error, connect } = useWallet()
+export function WalletButton({ wallet }: { wallet: ReturnType<typeof useWallet> }) {
+  const { status, address, walletName, error, connect } = wallet
   const [showError, setShowError] = useState(false)
 
   async function handleClick() {

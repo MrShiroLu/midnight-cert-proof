@@ -1,12 +1,32 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { InteractiveDotGrid } from './InteractiveDotGrid'
 import { RoleWatermark } from './RoleWatermark'
 import { WalletButton } from './WalletButton'
+import { useWallet } from './wallet'
+import {
+  commitmentOf,
+  configureProviders,
+  createHolderPrivateState,
+  createIssuerPrivateState,
+  currentNetworkId,
+  daysSinceEpoch,
+  fromHex,
+  getRegistryState,
+  issueCertificate,
+  joinCertProofContract,
+  proveAndAccess,
+  setActivePrivateState,
+  toBytes32,
+  toHex,
+  type HolderCredential,
+} from './midnight'
 
 type Role = 'holder' | 'issuer'
+type Wallet = ReturnType<typeof useWallet>
 
 export function AppShell() {
+  const wallet = useWallet()
   const [role, setRole] = useState<Role>('holder')
   const contentRef = useRef<HTMLDivElement>(null)
   const [watermarkTop, setWatermarkTop] = useState(500)
@@ -37,12 +57,13 @@ export function AppShell() {
           <Link to="/" className="text-xl font-semibold">
             CertProof
           </Link>
-          <WalletButton />
+          <WalletButton wallet={wallet} />
         </header>
 
         <div className="border-b border-border bg-white/5 px-8 py-3 text-center text-base text-muted-foreground">
-          The contract isn't deployed to Preprod yet, so on-chain actions
-          below are still simulated even after the wallet connects.
+          {wallet.status === 'connected'
+            ? 'Connected to Preprod. Actions below submit real transactions and require a local proof server (see README).'
+            : 'Connect a Lace wallet to issue or prove on Preprod. Without one, this only shows the registry.'}
         </div>
 
         <main className="mx-auto max-w-2xl px-8 py-16">
@@ -70,7 +91,7 @@ export function AppShell() {
         </div>
 
           <div ref={contentRef} className="mt-10">
-            {role === 'holder' ? <HolderFlow /> : <IssuerPanel />}
+            {role === 'holder' ? <HolderFlow wallet={wallet} /> : <IssuerPanel wallet={wallet} />}
           </div>
         </main>
       </div>
@@ -108,19 +129,48 @@ function Field({
   )
 }
 
-function IssuerPanel() {
+function IssuerPanel({ wallet }: { wallet: Wallet }) {
+  const [issuerSecretHex, setIssuerSecretHex] = useState('')
   const [commitment, setCommitment] = useState('')
-  const [issued, setIssued] = useState(12)
-  const [status, setStatus] = useState<'idle' | 'issuing' | 'done'>('idle')
+  const [issued, setIssued] = useState<number | null>(null)
+  const [status, setStatus] = useState<'idle' | 'issuing' | 'done' | 'error'>('idle')
+  const [error, setError] = useState<string | null>(null)
 
-  function handleIssue() {
+  useEffect(() => {
+    getRegistryState()
+      .then((registry) => setIssued(registry ? Number(registry.issued) : 0))
+      .catch(() => setIssued(null))
+  }, [status])
+
+  async function handleIssue() {
     if (!commitment) return
+    if (wallet.status !== 'connected' || !wallet.api) {
+      setStatus('error')
+      setError('Connect a Lace wallet first.')
+      return
+    }
+    const secretHex = issuerSecretHex.replace(/^0x/, '')
+    if (secretHex.length !== 64) {
+      setStatus('error')
+      setError('Issuer secret key must be 32 bytes (64 hex chars).')
+      return
+    }
+
     setStatus('issuing')
-    setTimeout(() => {
-      setIssued((n) => n + 1)
+    setError(null)
+    try {
+      const providers = await configureProviders(wallet.api, currentNetworkId())
+      const issuerKey = fromHex(secretHex)
+      const contract = await joinCertProofContract(providers, createIssuerPrivateState(issuerKey))
+      await setActivePrivateState(providers, createIssuerPrivateState(issuerKey))
+      const commitmentBytes = fromHex(commitment.replace(/^0x/, ''))
+      await issueCertificate(contract, commitmentBytes)
       setCommitment('')
       setStatus('done')
-    }, 1200)
+    } catch (err) {
+      setStatus('error')
+      setError(err instanceof Error ? err.message : 'Issuing failed.')
+    }
   }
 
   return (
@@ -131,27 +181,37 @@ function IssuerPanel() {
         registry.
       </p>
 
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-8 flex flex-col gap-3">
         <input
-          value={commitment}
-          onChange={(e) => {
-            setCommitment(e.target.value.toLowerCase().replace(/[^x0-9a-f]/g, ''))
-            setStatus('idle')
-          }}
-          type="text"
-          inputMode="text"
+          value={issuerSecretHex}
+          onChange={(e) => setIssuerSecretHex(e.target.value.trim())}
+          type="password"
           maxLength={66}
-          placeholder="commitment (0x…)"
-          className="flex-1 rounded-md border border-border bg-black px-4 py-2.5 font-mono text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          placeholder="issuer secret key (0x…, stays on this device)"
+          className="rounded-md border border-border bg-black px-4 py-2.5 font-mono text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
         />
-        <button
-          type="button"
-          onClick={handleIssue}
-          disabled={!commitment || status === 'issuing'}
-          className="rounded-full bg-white px-6 py-2.5 text-base font-medium text-black transition-colors hover:bg-white/90 disabled:opacity-40"
-        >
-          {status === 'issuing' ? 'Issuing…' : 'Issue'}
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input
+            value={commitment}
+            onChange={(e) => {
+              setCommitment(e.target.value.toLowerCase().replace(/[^x0-9a-f]/g, ''))
+              setStatus('idle')
+            }}
+            type="text"
+            inputMode="text"
+            maxLength={66}
+            placeholder="commitment (0x…)"
+            className="flex-1 rounded-md border border-border bg-black px-4 py-2.5 font-mono text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          />
+          <button
+            type="button"
+            onClick={handleIssue}
+            disabled={!commitment || status === 'issuing'}
+            className="rounded-full bg-white px-6 py-2.5 text-base font-medium text-black transition-colors hover:bg-white/90 disabled:opacity-40"
+          >
+            {status === 'issuing' ? 'Issuing…' : 'Issue'}
+          </button>
+        </div>
       </div>
 
       {status === 'done' && (
@@ -159,16 +219,19 @@ function IssuerPanel() {
           Commitment added to the registry.
         </p>
       )}
+      {status === 'error' && error && (
+        <p className="mt-4 text-base text-red-400">{error}</p>
+      )}
 
       <div className="mt-10 flex items-center gap-2.5 text-base text-muted-foreground">
         <span className="h-2 w-2 rounded-full bg-foreground" />
-        {issued} certificates issued
+        {issued ?? '—'} certificates issued
       </div>
     </div>
   )
 }
 
-type HolderStage = 'form' | 'commitment' | 'proving' | 'result'
+type HolderStage = 'form' | 'commitment' | 'proving' | 'result' | 'error'
 
 const provingSteps = [
   'Preparing witness',
@@ -176,39 +239,75 @@ const provingSteps = [
   'Submitting to chain',
 ]
 
-function HolderFlow() {
+function generateCredentialFields() {
+  return {
+    credentialSecret: crypto.getRandomValues(new Uint8Array(32)),
+    salt: crypto.getRandomValues(new Uint8Array(32)),
+  }
+}
+
+function HolderFlow({ wallet }: { wallet: Wallet }) {
   const [stage, setStage] = useState<HolderStage>('form')
   const [provingStep, setProvingStep] = useState(0)
+  const [error, setError] = useState<string | null>(null)
   const [credential, setCredential] = useState({
     name: '',
     certificateId: '',
     grade: '',
     expiry: '',
   })
+  const secretFields = useRef(generateCredentialFields())
 
-  const commitment = '0x' + '4f2a9c'.repeat(6) + '1b'
+  const holderCredential = useMemo<HolderCredential | null>(() => {
+    if (stage === 'form') return null
+    return {
+      certificateId: toBytes32(credential.certificateId),
+      holderName: toBytes32(credential.name),
+      grade: toBytes32(credential.grade),
+      expiryDate: daysSinceEpoch(new Date(credential.expiry)),
+      ...secretFields.current,
+    }
+  }, [stage, credential])
+
+  const commitment = useMemo(() => {
+    if (!holderCredential) return ''
+    return '0x' + toHex(commitmentOf(createHolderPrivateState(holderCredential)))
+  }, [holderCredential])
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setStage('commitment')
   }
 
-  function handleProve() {
+  async function handleProve() {
+    if (!holderCredential) return
+    if (wallet.status !== 'connected' || !wallet.api) {
+      setError('Connect a Lace wallet first.')
+      setStage('error')
+      return
+    }
     setStage('proving')
     setProvingStep(0)
-    const timings = [900, 2200, 900]
-    timings.forEach((delay, i) => {
-      setTimeout(
-        () => {
-          if (i === timings.length - 1) {
-            setTimeout(() => setStage('result'), delay)
-          } else {
-            setProvingStep(i + 1)
-          }
-        },
-        timings.slice(0, i + 1).reduce((a, b) => a + b, 0),
-      )
-    })
+    setError(null)
+    try {
+      const providers = await configureProviders(wallet.api, currentNetworkId())
+      setProvingStep(1)
+      const privateState = createHolderPrivateState(holderCredential)
+      const contract = await joinCertProofContract(providers, privateState)
+      await setActivePrivateState(providers, privateState)
+      setProvingStep(2)
+      await proveAndAccess(contract, daysSinceEpoch(new Date()))
+      setStage('result')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Proof failed.')
+      setStage('error')
+    }
+  }
+
+  function reset() {
+    secretFields.current = generateCredentialFields()
+    setCredential({ name: '', certificateId: '', grade: '', expiry: '' })
+    setStage('form')
   }
 
   if (stage === 'form') {
@@ -360,6 +459,27 @@ function HolderFlow() {
     )
   }
 
+  if (stage === 'error') {
+    return (
+      <div>
+        <h1 className="text-2xl font-medium">Proof rejected</h1>
+        <p className="mt-2 text-lg text-red-400">{error}</p>
+        <p className="mt-4 text-base text-muted-foreground">
+          Common causes: proof server not running locally, wrong network,
+          certificate not yet issued, or this certificate already used at
+          this gate.
+        </p>
+        <button
+          type="button"
+          onClick={() => setStage('commitment')}
+          className="mt-8 rounded-full border border-border px-6 py-2.5 text-base transition-colors hover:bg-white/10"
+        >
+          Back
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-medium">Access granted</h1>
@@ -369,7 +489,7 @@ function HolderFlow() {
       </p>
       <button
         type="button"
-        onClick={() => setStage('form')}
+        onClick={reset}
         className="mt-8 rounded-full border border-border px-6 py-2.5 text-base transition-colors hover:bg-white/10"
       >
         Start over
