@@ -1,0 +1,127 @@
+// This file is part of riseMoon (Midnight New Moon submission).
+// SPDX-License-Identifier: Apache-2.0
+
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+// Public ledger state: issuer identity, an anonymous commitment registry
+// (Merkle tree), a nullifier set for single-use access, and public
+// counters. No credential contents (name, certificate id, grade, expiry)
+// are ever stored in the clear on ledger — only opaque hash commitments.
+export ledger issuerPk: Bytes<32>;
+export ledger commitments: MerkleTree<10, Bytes<32>>;
+export ledger nullifiers: Set<Bytes<32>>;
+export ledger issuedCount: Counter;
+export ledger verifiedCount: Counter;
+
+constructor(issuerPublicKey: Bytes<32>) {
+  issuerPk = disclose(issuerPublicKey);
+}
+
+// Private witnesses: supplied from off-chain private state, never sent
+// on-chain. `localSecretKey` is the issuer's signing key (used only to
+// authorize `issue`); the rest describe one credential the holder is
+// proving membership of.
+witness localSecretKey(): Bytes<32>;
+witness localCertificateId(): Bytes<32>;
+witness localHolderName(): Bytes<32>;
+witness localGrade(): Bytes<32>;
+witness localExpiryDate(): Uint<64>;
+witness localCredentialSecret(): Bytes<32>;
+witness localSalt(): Bytes<32>;
+witness localMerklePath(): MerkleTreePath<10, Bytes<32>>;
+
+// Issuer-only: add a holder-generated commitment to the registry. The
+// caller proves knowledge of the issuer's secret key rather than the
+// contract trusting a wallet address, since Compact circuits cannot
+// verify chain-native signatures.
+export circuit issue(commitment: Bytes<32>): [] {
+  const callerPk = disclose(issuerPublicKey(localSecretKey()));
+  assert(callerPk == issuerPk, "Only the issuer can add certificates");
+  commitments.insert(disclose(commitment));
+  issuedCount.increment(1);
+}
+
+// Holder: prove the credential is a member of the registry and unexpired,
+// then consume a nullifier so the same credential cannot grant access
+// through this gate twice. Which commitment matched is never disclosed —
+// only the fact that some valid, unused credential was proven.
+export circuit prove_and_access(today: Uint<64>): [] {
+  const commitment = computeCommitment(
+    localCertificateId(),
+    localHolderName(),
+    localGrade(),
+    localExpiryDate(),
+    localCredentialSecret(),
+    localSalt(),
+  );
+
+  const path = localMerklePath();
+  assert(path.leaf == commitment, "Merkle path does not match this certificate");
+  // Disclosing the derived root leaks nothing beyond what's already public
+  // (the tree's current root) — the leaf and path stay hidden.
+  assert(commitments.checkRoot(disclose(merkleTreePathRoot<10, Bytes<32>>(path))), "Certificate not found in registry");
+
+  // "today" is a disclosed public input rather than a hidden witness: the
+  // chain has no trusted clock, so the caller's claimed date is recorded
+  // in the transcript for auditability instead of silently trusted. See
+  // README's privacy/limitations section.
+  assert(localExpiryDate() > disclose(today), "Certificate has expired");
+
+  const nullifier = disclose(computeNullifier(localCredentialSecret()));
+  assert(!nullifiers.member(nullifier), "This certificate was already used at this gate");
+  nullifiers.insert(nullifier);
+  verifiedCount.increment(1);
+}
+
+// Same membership + expiry checks as prove_and_access, but does not
+// consume a nullifier — for contexts that want repeatable verification
+// instead of single-use access.
+export circuit verify_only(today: Uint<64>): [] {
+  const commitment = computeCommitment(
+    localCertificateId(),
+    localHolderName(),
+    localGrade(),
+    localExpiryDate(),
+    localCredentialSecret(),
+    localSalt(),
+  );
+
+  const path = localMerklePath();
+  assert(path.leaf == commitment, "Merkle path does not match this certificate");
+  assert(commitments.checkRoot(disclose(merkleTreePathRoot<10, Bytes<32>>(path))), "Certificate not found in registry");
+  assert(localExpiryDate() > disclose(today), "Certificate has expired");
+}
+
+export circuit issuerPublicKey(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "certproof:issuer:"), sk]);
+}
+
+// Commitment = hash(credential fields, holder secret, salt). Given to the
+// issuer off-chain; only this opaque hash ever reaches the chain.
+export circuit computeCommitment(
+  certificateId: Bytes<32>,
+  holderName: Bytes<32>,
+  grade: Bytes<32>,
+  expiryDate: Uint<64>,
+  credentialSecret: Bytes<32>,
+  salt: Bytes<32>,
+): Bytes<32> {
+  return persistentHash<Vector<7, Bytes<32>>>([
+    pad(32, "certproof:commit:"),
+    certificateId,
+    holderName,
+    grade,
+    expiryDate as Field as Bytes<32>,
+    credentialSecret,
+    salt,
+  ]);
+}
+
+// Nullifier = hash(secret, different domain tag than the commitment). The
+// same secret produces both, but only someone who knows the secret can
+// link a nullifier back to its commitment.
+export circuit computeNullifier(credentialSecret: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "certproof:null:"), credentialSecret]);
+}
