@@ -39,7 +39,7 @@ import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider'
 import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider'
 import { getNetworkId, setNetworkId } from '@midnight-ntwrk/midnight-js/network-id'
-import { assertIsContractAddress, toHex, fromHex } from '@midnight-ntwrk/midnight-js/utils'
+import { assertIsContractAddress, isHex, toHex, fromHex } from '@midnight-ntwrk/midnight-js/utils'
 import * as ledger from '@midnight-ntwrk/ledger-v8'
 import { MidnightBech32m, ShieldedAddress } from '@midnight-ntwrk/wallet-sdk-address-format'
 import type { ConnectedAPI } from '@midnight-ntwrk/dapp-connector-api'
@@ -141,11 +141,12 @@ export const createBrowserWalletProvider = async (
     getEncryptionPublicKey: () => encryptionPublicKey.toHexString(),
     async balanceTx(tx) {
       const { tx: balancedHex } = await connectedApi.balanceUnsealedTransaction(toHex(tx.serialize()))
-      return ledger.Transaction.deserialize('signature', 'proof', 'binding', fromHex(balancedHex)) as ReturnType<
-        WalletProvider['balanceTx']
-      > extends Promise<infer T>
-        ? T
-        : never
+      return ledger.Transaction.deserialize(
+        'signature',
+        'proof',
+        'binding',
+        fromHex(balancedHex),
+      ) as Awaited<ReturnType<WalletProvider['balanceTx']>>
     },
     async submitTx(tx) {
       await connectedApi.submitTransaction(toHex(tx.serialize()))
@@ -216,4 +217,4 @@ export const getRegistryState = async (
 }
 
 export const currentNetworkId = getNetworkId
-export { toHex, fromHex }
+export { toHex, fromHex, isHex }

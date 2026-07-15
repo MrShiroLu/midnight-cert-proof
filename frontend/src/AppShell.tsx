@@ -13,6 +13,7 @@ import {
   daysSinceEpoch,
   fromHex,
   getRegistryState,
+  isHex,
   issueCertificate,
   joinCertProofContract,
   proveAndAccess,
@@ -150,9 +151,15 @@ function IssuerPanel({ wallet }: { wallet: Wallet }) {
       return
     }
     const secretHex = issuerSecretHex.replace(/^0x/, '')
-    if (secretHex.length !== 64) {
+    const commitmentHex = commitment.replace(/^0x/, '')
+    if (!isHex(secretHex, 32)) {
       setStatus('error')
-      setError('Issuer secret key must be 32 bytes (64 hex chars).')
+      setError('Issuer secret key must be 32 bytes of hex (64 hex chars).')
+      return
+    }
+    if (!isHex(commitmentHex, 32)) {
+      setStatus('error')
+      setError('Commitment must be 32 bytes of hex (64 hex chars).')
       return
     }
 
@@ -163,7 +170,7 @@ function IssuerPanel({ wallet }: { wallet: Wallet }) {
       const issuerKey = fromHex(secretHex)
       const contract = await joinCertProofContract(providers, createIssuerPrivateState(issuerKey))
       await setActivePrivateState(providers, createIssuerPrivateState(issuerKey))
-      const commitmentBytes = fromHex(commitment.replace(/^0x/, ''))
+      const commitmentBytes = fromHex(commitmentHex)
       await issueCertificate(contract, commitmentBytes)
       setCommitment('')
       setStatus('done')

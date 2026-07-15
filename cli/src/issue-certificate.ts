@@ -3,7 +3,7 @@
  * registry, using the issuer's secret key.
  */
 
-import { fromHex } from '@midnight-ntwrk/midnight-js/utils';
+import { assertIsContractAddress, assertIsHex, fromHex } from '@midnight-ntwrk/midnight-js/utils';
 import * as api from './api.js';
 
 const [SEED, ISSUER_SECRET_HEX, CONTRACT_ADDRESS, COMMITMENT_HEX] = process.argv.slice(2);
@@ -11,6 +11,9 @@ if (!SEED || !ISSUER_SECRET_HEX || !CONTRACT_ADDRESS || !COMMITMENT_HEX) {
   console.error('Usage: issue-certificate.ts <hex-seed> <issuer-secret-hex> <contract-address> <commitment-hex>');
   process.exit(1);
 }
+assertIsHex(ISSUER_SECRET_HEX, 32);
+assertIsContractAddress(CONTRACT_ADDRESS);
+assertIsHex(COMMITMENT_HEX, 32);
 
 const { walletCtx, providers } = await api.bootstrap(SEED);
 
