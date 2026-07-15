@@ -44,8 +44,8 @@ export function AppShell() {
   }, [])
 
   return (
-    <div className="relative min-h-svh overflow-hidden bg-black text-foreground">
-      <InteractiveDotGrid className="pointer-events-none absolute inset-x-0 top-16 h-[650px] w-full" />
+    <div className="relative h-svh overflow-hidden bg-black text-foreground">
+      <InteractiveDotGrid className="pointer-events-none absolute inset-x-0 top-0 h-[650px] w-full" />
       <div className="noise-overlay pointer-events-none fixed inset-0" />
 
       <RoleWatermark
@@ -53,7 +53,7 @@ export function AppShell() {
         top={watermarkTop}
       />
 
-      <div className="relative">
+      <div className="relative flex h-full flex-col">
         <header className="flex items-center justify-between border-b border-border px-8 py-6">
           <Link to="/" className="text-xl font-semibold">
             CertProof
@@ -61,13 +61,13 @@ export function AppShell() {
           <WalletButton wallet={wallet} />
         </header>
 
-        <div className="border-b border-border bg-white/5 px-8 py-3 text-center text-base text-muted-foreground">
-          {wallet.status === 'connected'
-            ? 'Connected to Preprod. Actions below submit real transactions and require a local proof server (see README).'
-            : 'Connect a Lace wallet to issue or prove on Preprod. Without one, this only shows the registry.'}
-        </div>
+        {wallet.status !== 'connected' && (
+          <div className="border-b border-border bg-white/5 px-8 py-3 text-center text-base text-muted-foreground">
+            Connect a Lace wallet to issue or prove on Preprod. Without one, this only shows the registry.
+          </div>
+        )}
 
-        <main className="mx-auto max-w-2xl px-8 py-16">
+        <main className="mx-auto w-full max-w-2xl flex-1 overflow-hidden px-8 py-16">
           <div
             role="tablist"
             aria-label="Role"
@@ -102,26 +102,13 @@ export function AppShell() {
 
 function Field({
   label,
-  where,
   ...props
 }: {
   label: string
-  where: 'device' | 'chain'
 } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="flex items-center justify-between text-base">
-        {label}
-        <span
-          className={`rounded-full border px-2.5 py-0.5 text-sm ${
-            where === 'device'
-              ? 'border-border text-muted-foreground'
-              : 'border-foreground/40 text-foreground'
-          }`}
-        >
-          {where === 'device' ? 'stays on this device' : 'goes on chain'}
-        </span>
-      </span>
+      <span className="text-base">{label}</span>
       <input
         {...props}
         className="rounded-md border border-border bg-black px-4 py-2.5 text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
@@ -232,7 +219,7 @@ function IssuerPanel({ wallet }: { wallet: Wallet }) {
 
       <div className="mt-10 flex items-center gap-2.5 text-base text-muted-foreground">
         <span className="h-2 w-2 rounded-full bg-foreground" />
-        {issued ?? '—'} certificates issued
+        {issued ?? '-'} certificate{issued === 1 ? '' : 's'} issued
       </div>
     </div>
   )
@@ -322,14 +309,13 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
       <form onSubmit={handleCreate}>
         <h1 className="text-2xl font-medium">Create a credential</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          These fields are generated on your device. Only a commitment — a
-          hash of all of it — will ever leave it.
+          These fields stay on this device. Only a commitment - a hash of all
+          of it - will ever leave it.
         </p>
 
         <div className="mt-8 flex flex-col gap-5">
           <Field
             label="Name"
-            where="device"
             required
             maxLength={64}
             placeholder="Ada Lovelace"
@@ -343,7 +329,6 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
           />
           <Field
             label="Certificate ID"
-            where="device"
             required
             maxLength={32}
             placeholder="CERT-2026-0142"
@@ -359,7 +344,6 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
           />
           <Field
             label="Grade"
-            where="device"
             required
             maxLength={4}
             placeholder="A or 95"
@@ -373,7 +357,6 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
           />
           <Field
             label="Expiry date"
-            where="device"
             type="date"
             required
             min={new Date().toISOString().split('T')[0]}
@@ -492,7 +475,7 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
       <h1 className="text-2xl font-medium">Access granted</h1>
       <p className="mt-2 text-lg text-muted-foreground">
         The proof succeeded. The registry now shows one more successful
-        verification — nothing else.
+        verification - nothing else.
       </p>
       <button
         type="button"

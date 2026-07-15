@@ -1,29 +1,26 @@
 import { Link } from 'react-router-dom'
 import { GradientBackground } from './GradientBackground'
 import { InteractiveDotGrid } from './InteractiveDotGrid'
-import { WalletButton } from './WalletButton'
-import { useWallet } from './wallet'
 
 const steps = [
   {
     n: '01',
     title: 'Holder creates a credential',
-    body: 'Name, certificate ID, grade and expiry are generated on the holder’s own device, along with a secret. Only a commitment — a hash of all of it — leaves the device.',
+    body: 'Name, certificate ID, grade and expiry are generated on the holder’s own device, along with a secret. Only a commitment - a hash of all of it - leaves the device.',
   },
   {
     n: '02',
     title: 'Issuer adds the commitment',
-    body: 'The issuer records the commitment in an on-chain registry. It’s an opaque hash — nothing about the certificate is readable from it.',
+    body: 'The issuer records the commitment in an on-chain registry. It’s an opaque hash - nothing about the certificate is readable from it.',
   },
   {
     n: '03',
     title: 'Holder proves it’s valid',
-    body: 'A zero-knowledge proof shows the certificate is in the registry and unexpired — without revealing which one it is, or who holds it.',
+    body: 'A zero-knowledge proof shows the certificate is in the registry and unexpired - without revealing which one it is, or who holds it.',
   },
 ]
 
 export function Landing() {
-  const wallet = useWallet()
   return (
     <div className="relative min-h-svh">
       <GradientBackground />
@@ -33,7 +30,6 @@ export function Landing() {
       <div className="relative flex min-h-svh flex-col">
         <header className="flex items-center justify-between px-8 py-6">
           <span className="text-xl font-semibold">CertProof</span>
-          <WalletButton wallet={wallet} />
         </header>
 
         <main className="flex flex-1 flex-col justify-center px-8 py-16">

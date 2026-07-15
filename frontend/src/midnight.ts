@@ -37,7 +37,6 @@ import { findDeployedContract } from '@midnight-ntwrk/midnight-js/contracts'
 import type { ProvableCircuitId } from '@midnight-ntwrk/compact-js'
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider'
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider'
-import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider'
 import { getNetworkId, setNetworkId } from '@midnight-ntwrk/midnight-js/network-id'
 import { assertIsContractAddress, isHex, toHex, fromHex } from '@midnight-ntwrk/midnight-js/utils'
 import * as ledger from '@midnight-ntwrk/ledger-v8'
@@ -163,6 +162,11 @@ export const configureProviders = async (
   const accountId = walletProvider.getCoinPublicKey()
   const storagePassword = `${btoa(accountId)}!`
   const zkConfigProvider = new FetchZkConfigProvider<CertProofCircuits>(ZK_BASE)
+  // ponytail: loaded lazily, not at module scope — this package's browser
+  // build breaks Vite's dep pre-bundling on eager import (crashes the page
+  // before a wallet is even connected). Only needed once a user actually
+  // issues/proves, so import it then.
+  const { levelPrivateStateProvider } = await import('@midnight-ntwrk/midnight-js-level-private-state-provider')
   return {
     privateStateProvider: levelPrivateStateProvider<typeof CertProofPrivateStateId>({
       privateStateStoreName: 'certproof-private-state',
