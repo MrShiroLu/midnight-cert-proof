@@ -26,6 +26,21 @@ import {
 type Role = 'holder' | 'issuer'
 type Wallet = ReturnType<typeof useWallet>
 
+// ContractRuntimeError wraps the actual circuit assertion (e.g. "Certificate
+// has expired") in `.cause` and puts a generic "Error executing circuit ..."
+// in `.message` — unwrap so the UI shows the reason instead of the wrapper.
+function errorMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback
+  let deepest: Error = err
+  let cause = (deepest as { cause?: unknown }).cause
+  while (cause instanceof Error) {
+    deepest = cause
+    cause = (deepest as { cause?: unknown }).cause
+  }
+  if (typeof cause === 'string' && cause) return cause
+  return deepest.message || err.message
+}
+
 export function AppShell() {
   const wallet = useWallet()
   const [role, setRole] = useState<Role>('holder')
@@ -54,7 +69,7 @@ export function AppShell() {
       />
 
       <div className="relative flex h-full flex-col">
-        <header className="flex items-center justify-between border-b border-border px-8 py-6">
+        <header className="flex h-[92px] items-center justify-between border-b border-border px-8">
           <Link to="/" className="text-xl font-semibold">
             CertProof
           </Link>
@@ -92,7 +107,14 @@ export function AppShell() {
         </div>
 
           <div ref={contentRef} className="mt-10">
-            {role === 'holder' ? <HolderFlow wallet={wallet} /> : <IssuerPanel wallet={wallet} />}
+            {/* Both stay mounted so switching tabs (e.g. to submit a commitment
+                as issuer) doesn't reset the holder's in-progress credential. */}
+            <div hidden={role !== 'holder'}>
+              <HolderFlow wallet={wallet} />
+            </div>
+            <div hidden={role !== 'issuer'}>
+              <IssuerPanel wallet={wallet} />
+            </div>
           </div>
         </main>
       </div>
@@ -163,7 +185,7 @@ function IssuerPanel({ wallet }: { wallet: Wallet }) {
       setStatus('done')
     } catch (err) {
       setStatus('error')
-      setError(err instanceof Error ? err.message : 'Issuing failed.')
+      setError(errorMessage(err, 'Issuing failed.'))
     }
   }
 
@@ -244,6 +266,7 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
   const [stage, setStage] = useState<HolderStage>('form')
   const [provingStep, setProvingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
   const [credential, setCredential] = useState({
     name: '',
     certificateId: '',
@@ -270,6 +293,20 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault()
+    if (wallet.status !== 'connected' || !wallet.api) {
+      setError('Connect a Lace wallet first.')
+      setStage('error')
+      return
+    }
+    try {
+      toBytes32(credential.name)
+      toBytes32(credential.certificateId)
+      toBytes32(credential.grade)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid credential field.')
+      setStage('error')
+      return
+    }
     setStage('commitment')
   }
 
@@ -293,7 +330,7 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
       await proveAndAccess(contract, daysSinceEpoch(new Date()))
       setStage('result')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Proof failed.')
+      setError(errorMessage(err, 'Proof failed.'))
       setStage('error')
     }
   }
@@ -390,13 +427,24 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
           <code className="flex-1 truncate font-mono text-base">
             {commitment}
           </code>
-          <button
-            type="button"
-            onClick={() => navigator.clipboard.writeText(commitment)}
-            className="rounded-full border border-border px-4 py-1.5 text-base transition-colors hover:bg-white/10"
-          >
-            Copy
-          </button>
+          <div className="relative">
+            {copied && (
+              <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-white px-2.5 py-1 text-sm font-medium text-black">
+                Copied
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(commitment)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1500)
+              }}
+              className="rounded-full border border-border px-4 py-1.5 text-base transition-colors hover:bg-white/10"
+            >
+              Copy
+            </button>
+          </div>
         </div>
 
         <p className="mt-8 text-base text-muted-foreground">

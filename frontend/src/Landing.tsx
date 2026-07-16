@@ -28,7 +28,7 @@ export function Landing() {
       <div className="noise-overlay pointer-events-none fixed inset-0" />
 
       <div className="relative flex min-h-svh flex-col">
-        <header className="flex items-center justify-between px-8 py-6">
+        <header className="flex h-[92px] items-center justify-between px-8">
           <span className="text-xl font-semibold">CertProof</span>
         </header>
 
