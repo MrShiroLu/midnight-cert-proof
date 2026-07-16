@@ -46,7 +46,7 @@ import type { ConnectedAPI } from '@midnight-ntwrk/dapp-connector-api'
 setNetworkId('preprod')
 
 // From README.md's Preprod Contract Address table.
-export const CONTRACT_ADDRESS = '5d19ac150ab47c1b114e065675db18d593eb0934a85fafc5352a896fa474c47c'
+export const CONTRACT_ADDRESS = 'e8d1976f5c2a47f6c933bbb60f86121102800453a6e1aadb72ea628e19d464fc'
 const INDEXER = 'https://indexer.preprod.midnight.network/api/v3/graphql'
 const INDEXER_WS = 'wss://indexer.preprod.midnight.network/api/v3/graphql/ws'
 const PROOF_SERVER = 'http://127.0.0.1:6300'

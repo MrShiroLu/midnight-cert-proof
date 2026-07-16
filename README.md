@@ -17,7 +17,7 @@ The proof server runs locally, so the demo page should show the same
 
 | Contract | Network | Address |
 |---|---|---|
-| CertProof | Preprod | `5d19ac150ab47c1b114e065675db18d593eb0934a85fafc5352a896fa474c47c` |
+| CertProof | Preprod | `e8d1976f5c2a47f6c933bbb60f86121102800453a6e1aadb72ea628e19d464fc` |
 
 ## What This Does
 
