@@ -4,11 +4,11 @@
 
 A confidential certificate verification dApp on Midnight: an issuer registers a
 certificate as an opaque commitment, and the holder later proves on-chain that
-they hold a valid, unexpired certificate — without ever revealing its contents.
+they hold a valid, unexpired certificate without ever revealing its contents.
 
 ## Live Demo
 
-[TO FILL IN — deploy the frontend (Vercel/Netlify) and link it here]
+[TO FILL IN: deploy the frontend (Vercel/Netlify) and link it here]
 
 The proof server runs locally, so the demo page should show the same
 "Prerequisites" box as below.
@@ -30,7 +30,7 @@ The proof server runs locally, so the demo page should show the same
   checks membership in the registry, checks the certificate hasn't expired,
   and inserts a **nullifier** so the same certificate can't be used twice at
   the same gate.
-- An on-chain observer sees that *a* valid certificate was proven — never
+- An on-chain observer sees that *a* valid certificate was proven, never
   which one, and never its contents.
 
 ## Privacy Model
@@ -45,10 +45,10 @@ The proof server runs locally, so the demo page should show the same
 | Merkle path | Private witness | No one |
 | "Valid credential proven" result | Public | Everyone |
 
-**PUBLIC** — issuer key, commitment tree, nullifier set, issued/verified counts.
-**PRIVATE** — credential contents, holder secret, Merkle path; these never
+**PUBLIC**: issuer key, commitment tree, nullifier set, issued/verified counts.
+**PRIVATE**: credential contents, holder secret, Merkle path; these never
 leave the holder's device.
-**PROVED without revealing** — that the holder possesses *some* valid,
+**PROVED without revealing**: that the holder possesses *some* valid,
 unexpired, not-yet-used certificate in the registry.
 
 ## Privacy Claim
@@ -76,15 +76,15 @@ the credential fields and secret never appear at the byte level (see
 
 - **Contract**: [Compact](https://docs.midnight.network/) (Midnight's ZK
   smart contract language), compiled with `compact compile`.
-- **Testing**: Vitest against the Compact contract simulator/runtime — no
+- **Testing**: Vitest against the Compact contract simulator/runtime, no
   live chain required.
 - **Frontend**: React 19 + Vite, React Router, Tailwind CSS, the Midnight
   Lace dApp connector (`@midnight-ntwrk/dapp-connector-api`).
 - **CLI**: Node/TypeScript deployment script (`cli/`) using `midnight-js`
   and the wallet SDK to deploy the contract to Preprod from a seed-derived
-  wallet and drive the issue → prove → replay-rejection flow end to end —
-  this is how the Preprod contract address below was produced.
-- **CI**: GitHub Actions — installs the pinned Compact toolchain, compiles
+  wallet and drive the issue → prove → replay-rejection flow end to end.
+  This is how the Preprod contract address below was produced.
+- **CI**: GitHub Actions, installs the pinned Compact toolchain, compiles
   the contract, runs the test suite, and builds/typechecks every workspace.
 
 ## Prerequisites
@@ -119,30 +119,10 @@ npm run deploy --workspace=cli -- <hex-seed>
 
 This deploys the contract, issues one demo commitment, proves it once
 (access granted), and attempts to reuse it (rejected by the nullifier
-check) — printing the deployed contract address for the table above.
+check), printing the deployed contract address for the table above.
 
 ## Run Tests
 
 ```bash
 npm test --workspace=contract
-```
-
-## CI/CD
-
-`.github/workflows/ci.yml` runs on every push to `main` and on pull requests:
-checkout → Node 22 → install the pinned Compact toolchain → `npm ci` →
-compile the contract → run the test suite → build the contract package →
-build the frontend → typecheck and build the CLI.
-
-## Product Proposal
-
-See [PROPOSAL.md](./PROPOSAL.md) for the product definition, Midnight
-rationale, data model, and Mainnet feasibility notes.
-
-## Project Layout
-
-```
-contract/   Compact contract source, compiled ZK circuit artifacts, witnesses, tests
-cli/        Node/TypeScript CLI: deploys the contract to Preprod and drives the demo flow
-frontend/   React + Vite app: Lace wallet connect, issuer panel, holder proof flow
 ```
