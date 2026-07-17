@@ -8,10 +8,9 @@ they hold a valid, unexpired certificate without ever revealing its contents.
 
 ## Live Demo
 
-[TO FILL IN: deploy the frontend (Vercel/Netlify) and link it here]
+Live Demo: 
+Demo Video: https://youtu.be/KVycfq2xmrU
 
-The proof server runs locally, so the demo page should show the same
-"Prerequisites" box as below.
 
 ## Preprod Contract Address
 
@@ -62,31 +61,6 @@ which serializes the full public transcript of a successful proof and asserts
 the credential fields and secret never appear at the byte level (see
 `contract/src/test/byte-scan.ts`).
 
-### Known limitations (honest, not hidden)
-
-- **Expiry check**: Compact circuits have no trusted clock. `prove_and_access`
-  takes "today" as a disclosed public input and asserts `expiryDate > today`;
-  the chain does not independently verify that the supplied date is correct.
-  Production would need block time or an issuer-advanced epoch counter.
-- **Revocation**: proving non-membership in a revocation list while keeping
-  the commitment hidden is out of scope for this submission. Validity is
-  bounded only by expiry. See `PROPOSAL.md` for the roadmap treatment.
-
-## Tech Stack
-
-- **Contract**: [Compact](https://docs.midnight.network/) (Midnight's ZK
-  smart contract language), compiled with `compact compile`.
-- **Testing**: Vitest against the Compact contract simulator/runtime, no
-  live chain required.
-- **Frontend**: React 19 + Vite, React Router, Tailwind CSS, the Midnight
-  Lace dApp connector (`@midnight-ntwrk/dapp-connector-api`).
-- **CLI**: Node/TypeScript deployment script (`cli/`) using `midnight-js`
-  and the wallet SDK to deploy the contract to Preprod from a seed-derived
-  wallet and drive the issue → prove → replay-rejection flow end to end.
-  This is how the Preprod contract address below was produced.
-- **CI**: GitHub Actions, installs the pinned Compact toolchain, compiles
-  the contract, runs the test suite, and builds/typechecks every workspace.
-
 ## Prerequisites
 
 - Node.js 20+
@@ -100,7 +74,7 @@ the credential fields and secret never appear at the byte level (see
   docker run -p 6300:6300 midnightnetwork/proof-server -- 'midnight-proof-server --network preprod'
   ```
 
-## Setup & Run Locally
+## Setup & Run
 
 ```bash
 npm install
@@ -108,21 +82,10 @@ npm run compact --workspace=contract   # recompile the circuits (optional, artif
 npm run dev --workspace=frontend       # http://localhost:5173
 ```
 
-### Deploying to Preprod (CLI)
-
-```bash
-# 1. Start the local proof server (see Prerequisites above).
-# 2. Fund a Preprod wallet: generate a seed, send it tNight from
-#    https://faucet.preprod.midnight.network/, then:
-npm run deploy --workspace=cli -- <hex-seed>
-```
-
-This deploys the contract, issues one demo commitment, proves it once
-(access granted), and attempts to reuse it (rejected by the nullifier
-check), printing the deployed contract address for the table above.
-
 ## Run Tests
 
 ```bash
 npm test --workspace=contract
 ```
+
+![Test output](./img/test.png)

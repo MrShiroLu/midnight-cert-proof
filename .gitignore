@@ -5,9 +5,9 @@ cli/logs/
 cli/midnight-level-db/
 contract/dist/
 contract/reports/
-contract/src/managed/**/keys/*.prover
 frontend/dist/
 frontend/public/zk/
 
 *.log
 .DS_Store
+.claude
