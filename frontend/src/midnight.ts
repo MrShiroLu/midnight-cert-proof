@@ -33,7 +33,7 @@ import type {
   DeployedContract,
   FoundContract,
 } from '@midnight-ntwrk/midnight-js/contracts'
-import { findDeployedContract } from '@midnight-ntwrk/midnight-js/contracts'
+import { deployContract, findDeployedContract } from '@midnight-ntwrk/midnight-js/contracts'
 import type { ProvableCircuitId } from '@midnight-ntwrk/compact-js'
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider'
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider'
@@ -46,7 +46,7 @@ import type { ConnectedAPI } from '@midnight-ntwrk/dapp-connector-api'
 setNetworkId('preprod')
 
 // From README.md's Preprod Contract Address table.
-export const CONTRACT_ADDRESS = 'e8d1976f5c2a47f6c933bbb60f86121102800453a6e1aadb72ea628e19d464fc'
+export const CONTRACT_ADDRESS = '1e6f3a28d94600dae9359a1cf6585fc550c91ccd5280f6654b919e9e07fae6f6'
 const INDEXER = 'https://indexer.preprod.midnight.network/api/v3/graphql'
 const INDEXER_WS = 'wss://indexer.preprod.midnight.network/api/v3/graphql/ws'
 const PROOF_SERVER = 'http://127.0.0.1:6300'
@@ -180,6 +180,20 @@ export const configureProviders = async (
     midnightProvider: walletProvider,
   }
 }
+
+// ponytail: bypasses the CLI's node wallet entirely, Lace already pays its
+// own fees via its own (working) dust generation, sidestepping the
+// wallet-sdk-dust-wallet/indexer schema mismatch the CLI hits on Preprod.
+export const deployCertProofContract = async (
+  providers: CertProofProviders,
+  issuerSecretKey: Uint8Array,
+): Promise<DeployedCertProofContract> =>
+  deployContract(providers, {
+    compiledContract: certProofCompiledContract,
+    privateStateId: CertProofPrivateStateId,
+    initialPrivateState: createIssuerPrivateState(issuerSecretKey),
+    args: [issuerPublicKeyOf(issuerSecretKey)],
+  })
 
 export const joinCertProofContract = async (
   providers: CertProofProviders,

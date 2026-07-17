@@ -11,6 +11,7 @@ import {
   createIssuerPrivateState,
   currentNetworkId,
   daysSinceEpoch,
+  deployCertProofContract,
   fromHex,
   getRegistryState,
   isHex,
@@ -109,12 +110,17 @@ export function AppShell() {
           <div ref={contentRef} className="mt-10">
             {/* Both stay mounted so switching tabs (e.g. to submit a commitment
                 as issuer) doesn't reset the holder's in-progress credential. */}
-            <div hidden={role !== 'holder'}>
-              <HolderFlow wallet={wallet} />
-            </div>
-            <div hidden={role !== 'issuer'}>
-              <IssuerPanel wallet={wallet} />
-            </div>
+            <fieldset
+              disabled={wallet.status !== 'connected'}
+              className={`min-w-0 ${wallet.status !== 'connected' ? 'opacity-50' : ''}`}
+            >
+              <div hidden={role !== 'holder'}>
+                <HolderFlow wallet={wallet} />
+              </div>
+              <div hidden={role !== 'issuer'}>
+                <IssuerPanel wallet={wallet} />
+              </div>
+            </fieldset>
           </div>
         </main>
       </div>
@@ -136,6 +142,103 @@ function Field({
         className="rounded-md border border-border bg-black px-4 py-2.5 text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
       />
     </label>
+  )
+}
+
+function CopyField({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="flex items-center gap-3 rounded-md border border-border bg-white/5 px-4 py-3">
+      <code className="flex-1 truncate font-mono text-base">{value}</code>
+      <div className="relative">
+        {copied && (
+          <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-white px-2.5 py-1 text-sm font-medium text-black">
+            Copied
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard.writeText(value)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          }}
+          className="rounded-full border border-border px-4 py-1.5 text-base transition-colors hover:bg-white/10"
+        >
+          Copy
+        </button>
+      </div>
+    </div>
+  )
+}
+
+type DeployState =
+  | { status: 'idle' | 'deploying' }
+  | { status: 'done'; address: string; secretKey: string }
+  | { status: 'error'; error: string }
+
+// ponytail: dev-only bootstrap tool, not part of the normal issuer flow. The
+// CLI's own deploy script hits a wallet-sdk-dust-wallet/indexer schema
+// mismatch on Preprod (SyncWalletError decoding dust ledger events); Lace
+// pays its own fees and isn't affected, so this is the fallback way to mint
+// a fresh contract until that SDK is fixed upstream.
+function DeployNewContract({ wallet }: { wallet: Wallet }) {
+  const [deploy, setDeploy] = useState<DeployState>({ status: 'idle' })
+
+  async function handleDeploy() {
+    if (wallet.status !== 'connected' || !wallet.api) {
+      setDeploy({ status: 'error', error: 'Connect a Lace wallet first.' })
+      return
+    }
+    setDeploy({ status: 'deploying' })
+    try {
+      const providers = await configureProviders(wallet.api, currentNetworkId())
+      const issuerKey = crypto.getRandomValues(new Uint8Array(32))
+      const contract = await deployCertProofContract(providers, issuerKey)
+      setDeploy({
+        status: 'done',
+        address: contract.deployTxData.public.contractAddress,
+        secretKey: '0x' + toHex(issuerKey),
+      })
+    } catch (err) {
+      setDeploy({ status: 'error', error: errorMessage(err, 'Deploy failed.') })
+    }
+  }
+
+  return (
+    <details className="mt-10 rounded-md border border-border p-4">
+      <summary className="cursor-pointer text-base text-muted-foreground">
+        Deploy a new contract (dev)
+      </summary>
+      <p className="mt-3 text-base text-muted-foreground">
+        Deploys via your connected Lace wallet, which pays its own fees. Save
+        the address and secret key, then update CONTRACT_ADDRESS in
+        midnight.ts and rebuild.
+      </p>
+      <button
+        type="button"
+        onClick={handleDeploy}
+        disabled={deploy.status === 'deploying'}
+        className="mt-4 rounded-full border border-border px-6 py-2.5 text-base transition-colors hover:bg-white/10 disabled:opacity-40"
+      >
+        {deploy.status === 'deploying' ? 'Deploying…' : 'Deploy new contract'}
+      </button>
+      {deploy.status === 'error' && (
+        <p className="mt-4 text-base text-red-400">{deploy.error}</p>
+      )}
+      {deploy.status === 'done' && (
+        <div className="mt-4 flex flex-col gap-3">
+          <div>
+            <p className="mb-1 text-base">Contract address</p>
+            <CopyField value={deploy.address} />
+          </div>
+          <div>
+            <p className="mb-1 text-base">Issuer secret key</p>
+            <CopyField value={deploy.secretKey} />
+          </div>
+        </div>
+      )}
+    </details>
   )
 }
 
@@ -243,6 +346,12 @@ function IssuerPanel({ wallet }: { wallet: Wallet }) {
         <span className="h-2 w-2 rounded-full bg-foreground" />
         {issued ?? '-'} certificate{issued === 1 ? '' : 's'} issued
       </div>
+
+      {/* ponytail: hidden unless ?dev=1 is on the URL, so it never shows up
+          in a demo recording of the plain /app route. */}
+      {new URLSearchParams(window.location.search).has('dev') && (
+        <DeployNewContract wallet={wallet} />
+      )}
     </div>
   )
 }
@@ -483,10 +592,13 @@ function HolderFlow({ wallet }: { wallet: Wallet }) {
               }`}
             >
               <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm tabular-nums ${
+                className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm tabular-nums ${
                   i === provingStep ? 'border-foreground' : 'border-border'
                 }`}
               >
+                {i === provingStep && (
+                  <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-foreground" />
+                )}
                 {i < provingStep ? '✓' : i + 1}
               </span>
               {step}
