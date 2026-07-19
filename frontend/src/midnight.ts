@@ -213,15 +213,23 @@ export const setActivePrivateState = async (
   await providers.privateStateProvider.set(CertProofPrivateStateId, privateState)
 }
 
+// The generated contract types type each circuit's context against
+// @midnight-ntwrk/compact-runtime, but midnight-js's CircuitParameters helper
+// matches its own compact-js CircuitContext, so it infers the call args as
+// `never`. Assert the real runtime signature to bypass that SDK type skew.
+type CallTx<A extends unknown[]> = (...args: A) => Promise<{ public: FinalizedTxData }>
+
 export const issueCertificate = async (
   contract: DeployedCertProofContract,
   commitment: Uint8Array,
-): Promise<FinalizedTxData> => (await contract.callTx.issue(commitment)).public
+): Promise<FinalizedTxData> =>
+  (await (contract.callTx.issue as unknown as CallTx<[Uint8Array]>)(commitment)).public
 
 export const proveAndAccess = async (
   contract: DeployedCertProofContract,
   today: bigint,
-): Promise<FinalizedTxData> => (await contract.callTx.prove_and_access(today)).public
+): Promise<FinalizedTxData> =>
+  (await (contract.callTx.prove_and_access as unknown as CallTx<[bigint]>)(today)).public
 
 export const getRegistryState = async (
   contractAddress: ContractAddress = CONTRACT_ADDRESS,

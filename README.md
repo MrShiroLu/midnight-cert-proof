@@ -8,8 +8,8 @@ they hold a valid, unexpired certificate without ever revealing its contents.
 
 ## Live Demo
 
-Live Demo: 
-Demo Video: https://youtu.be/KVycfq2xmrU
+- Live Demo: https://midnight-cert-proof.vercel.app
+- Demo Video: https://youtu.be/KVycfq2xmrU
 
 
 ## Preprod Contract Address

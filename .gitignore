@@ -11,3 +11,5 @@ frontend/public/zk/
 *.log
 .DS_Store
 .claude
+.vercel
+.env*
